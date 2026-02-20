@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Arc Tales</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial; }
+        body { background: #f0f2f5; }
+        .header { background: #4f46e5; color: white; padding: 20px; text-align: center; }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .card { background: white; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        button { background: #4f46e5; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #4338ca; }
+        input, textarea, select { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; }
+        textarea { min-height: 200px; }
+        .fee-box { background: #fef3c7; border: 2px solid #f59e0b; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center; }
+        .hidden { display: none; }
+        .story-preview { border-left: 4px solid #4f46e5; padding-left: 15px; margin: 10px 0; }
+        .badge { display: inline-block; background: #dbeafe; color: #1e40af; padding: 4px 12px; border-radius: 20px; font-size: 12px; margin-right: 5px; }
+        .wallet-btn { position: fixed; top: 20px; right: 20px; background: white; color: #4f46e5; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>📚 Arc Tales</h1>
+    <p>Write stories. Pay 1 USDC per upload. Live forever on blockchain.</p>
+    <button class="wallet-btn" onclick="connectWallet()" id="walletBtn">Connect Wallet</button>
+</div>
+
+<div class="container">
+
+    <!-- Write Story Form -->
+    <div class="card" id="writeSection">
+        <h2>Write Your Story</h2>
+        <input type="text" id="title" placeholder="Story Title">
+        
+        <select id="genre">
+            <option value="">Pick Genre</option>
+            <option>Fiction</option>
+            <option>Poetry</option>
+            <option>Sci-Fi</option>
+            <option>Romance</option>
+            <option>Horror</option>
+        </select>
+        
+        <textarea id="content" placeholder="Write your story here..."></textarea>
+        
+        <label>
+            <input type="checkbox" id="isPremium" onchange="togglePrice()"> 
+            Make Premium (charge readers)
+        </label>
+        
+        <div id="priceBox" class="hidden">
+            <input type="number" id="unlockPrice" placeholder="Price in USDC (e.g. 5)" value="1">
+        </div>
+        
+        <div class="fee-box">
+            <strong>📌 Upload Fee: 1 USDC</strong><br>
+            <small>This pays for blockchain storage</small>
+        </div>
+        
+        <button onclick="uploadStory()" id="uploadBtn">Publish Story (Pay 1 USDC)</button>
+    </div>
+
+    <!-- Stories Feed -->
+    <div class="card">
+        <h2>Latest Stories</h2>
+        <div id="storiesList">
+            <p>Connect wallet to see stories...</p>
+        </div>
+    </div>
+
+</div>
+
+<!-- Simple JavaScript -->
+<script>
+    // Fake contract for demo (replace with real contract later)
+    let wallet = null;
+    let stories = [];
+
+    function connectWallet() {
+        // Check if MetaMask exists
+        if (typeof window.ethereum === 'undefined') {
+            alert('Please install MetaMask: metamask.io');
+            return;
+        }
+        
+        // Connect
+        window.ethereum.request({ method: 'eth_requestAccounts' })
+            .then(accounts => {
+                wallet = accounts[0];
+                document.getElementById('walletBtn').textContent = 
+                    wallet.slice(0,6) + '...' + wallet.slice(-4);
+                loadStories();
+            })
+            .catch(err => alert('Connection failed: ' + err.message));
+    }
+
+    function togglePrice() {
+        const checkbox = document.getElementById('isPremium');
+        const priceBox = document.getElementById('priceBox');
+        priceBox.className = checkbox.checked ? '' : 'hidden';
+    }
+
+    async function uploadStory() {
+        if (!wallet) {
+            alert('Connect wallet first!');
+            return;
+        }
+
+        const title = document.getElementById('title').value;
+        const content = document.getElementById('content').value;
+        const genre = document.getElementById('genre').value;
+        const isPremium = document.getElementById('isPremium').checked;
+        const price = document.getElementById('unlockPrice').value;
+
+        if (!title || !content || !genre) {
+            alert('Fill all fields!');
+            return;
+        }
+
+        const btn = document.getElementById('uploadBtn');
+        btn.textContent = 'Processing...';
+        btn.disabled = true;
+
+        try {
+            // STEP 1: Upload to free IPFS (web3.storage)
+            const ipfsHash = await uploadToIPFS(content);
+            
+            // STEP 2: Pay 1 USDC (this would be real blockchain transaction)
+            // For demo, we simulate it
+            await payUSDC(1);
+            
+            // STEP 3: Save story
+            const story = {
+                id: stories.length,
+                title,
+                genre,
+                author: wallet,
+                contentHash: ipfsHash,
+                preview: content.slice(0, 100) + '...',
+                isPremium,
+                unlockPrice: isPremium ? price : 0,
+                timestamp: new Date().toLocaleString()
+            };
+            
+            stories.unshift(story);
+            
+            alert('✅ Story published! Paid 1 USDC.');
+            clearForm();
+            loadStories();
+            
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+        
+        btn.textContent = 'Publish Story (Pay 1 USDC)';
+        btn.disabled = false;
+    }
+
+    async function uploadToIPFS(content) {
+        // FREE: Using a simple workaround
+        // In production, use web3.storage (free 5GB)
+        
+        // For demo: Create data URL (not real IPFS but works for testing)
+        const blob = new Blob([content], {type: 'text/plain'});
+        return 'ipfs-demo-' + Math.random().toString(36).slice(2);
+    }
+
+    async function payUSDC(amount) {
+        // This would be real USDC transfer on Arc Testnet
+        // For demo, we just wait 1 second
+        return new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    function loadStories() {
+        const list = document.getElementById('storiesList');
+        
+        if (stories.length === 0) {
+            list.innerHTML = '<p>No stories yet. Be the first!</p>';
+            return;
+        }
+        
+        list.innerHTML = stories.map(s => `
+            <div class="story-preview">
+                <h3>${s.title}</h3>
+                <span class="badge">${s.genre}</span>
+                <span class="badge">${s.isPremium ? '💰 ' + s.unlockPrice + ' USDC' : 'FREE'}</span>
+                <p style="color: #666; margin: 10px 0;">${s.preview}</p>
+                <small>By ${s.author.slice(0,6)}...${s.author.slice(-4)} • ${s.timestamp}</small>
+            </div>
+        `).join('');
+    }
+
+    function clearForm() {
+        document.getElementById('title').value = '';
+        document.getElementById('content').value = '';
+        document.getElementById('genre').value = '';
+        document.getElementById('isPremium').checked = false;
+        togglePrice();
+    }
+</script>
+
+</body>
+</html>
